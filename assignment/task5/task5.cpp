@@ -4,6 +4,7 @@
 #include <chrono>
 #include <ctime>
 #include <iomanip>
+#include <unordered_map>
 
 enum LogLevel 
 {
@@ -38,10 +39,14 @@ private:
 
     std::string levelToString(LogLevel level) const 
     {
-        if (level == LOG_NORMAL) { return "NORMAL"; }
-        if (level == LOG_WARNING) { return "WARNING"; }
-        if (level == LOG_ERROR) { return "ERROR"; }
-        return "UNKNOWN";
+        static const std::unordered_map<LogLevel, std::string> names = 
+        {
+            {LOG_NORMAL,  "NORMAL"},
+            {LOG_WARNING, "WARNING"},
+            {LOG_ERROR,   "ERROR"}
+        };
+        auto it = names.find(level);
+        return (it != names.end()) ? it->second : "UNKNOWN";
     }
 
 public:
