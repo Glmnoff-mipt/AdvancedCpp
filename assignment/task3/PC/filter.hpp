@@ -7,16 +7,17 @@
 #include <string>
 #include <cmath>
 #include <unordered_map>
+#include <memory>
+#include <utility>
 
 namespace pointcloud_preprocessor
 {
 
 class FilterParametr {
 public:
-    FilterParametr() {}
-    FilterParametr(std::unordered_map<std::string, double> params) : params_(std::move(params)) {}
-    
-    // Add new param or change exsistent
+    FilterParametr() = default;
+    explicit FilterParametr(std::unordered_map<std::string, double> params) : params_(std::move(params)) {}
+
     void ChangeParam(const std::string& param_name, double param_val) {
         params_[param_name] = param_val;
     }
@@ -26,61 +27,94 @@ public:
     }
 
     double GetParam(const std::string& param_name, double default_val) const noexcept {
-        auto it = params_.find(param_name);
-        if (it == params_.end())
-            return default_val;
-
-        return it->second;
+        if (auto it = params_.find(param_name); it != params_.end()) {
+            return it->second;
+        }
+        return default_val;
     }
 private:
     std::unordered_map<std::string, double> params_;
 };
 
-/** \brief @b Filter represents the base filter class. 
- */
+class PointMetricsStrategy {
+public:
+    virtual ~PointMetricsStrategy() = default;
+    virtual double GetDistance(const PointCloud* pc, size_t index) const = 0;
+    virtual double GetAzimuth(const PointCloud* pc, size_t index) const = 0;
+};
+
+class DefaultMetricsStrategy : public PointMetricsStrategy {
+public:
+    double GetDistance(const PointCloud* pc, size_t index) const override {
+        return pc->points_[index * pc->point_size_ + 5];
+    }
+    double GetAzimuth(const PointCloud* pc, size_t index) const override {
+        return pc->points_[index * pc->point_size_ + 6];
+    }
+};
+
+class XYZIRMetricsStrategy : public PointMetricsStrategy {
+public:
+    double GetDistance(const PointCloud* pc, size_t index) const override {
+        const size_t offset = index * pc->point_size_;
+        return std::hypot(pc->points_[offset], pc->points_[offset + 1], pc->points_[offset + 2]);
+    }
+    double GetAzimuth(const PointCloud* pc, size_t index) const override {
+        const size_t offset = index * pc->point_size_;
+        return std::atan2(pc->points_[offset + 1], pc->points_[offset]);
+    }
+};
+
+/** \brief @b Filter represents the base filter class. */
 class Filter
 {
 public:
-  Filter(const std::string & filter_name = "pointcloud_preprocessor_filter") : filter_name_(filter_name), logger_(filter_name_) {}
-  
-  const std::string& GetFilterName() { return filter_name_; }
-  
-  double GetDistance(PointCloud* pc, size_t index) {
-      if (pc->pointcloud_type_ == "XYZIR") {
-          double x = pc->points_[index * pc->point_size_ + 0];
-          double y = pc->points_[index * pc->point_size_ + 1];
-          double z = pc->points_[index * pc->point_size_ + 2];
-          return std::hypot(x, y, z);
-      }
-
-      return pc->points_[index * pc->point_size_ + 5];
+  explicit Filter(std::string filter_name = "pointcloud_preprocessor_filter") 
+      : filter_name_(std::move(filter_name)), logger_(filter_name_) 
+  {
+      format_strategies_["XYZIR"] = std::make_shared<XYZIRMetricsStrategy>();
+      default_strategy_ = std::make_shared<DefaultMetricsStrategy>();
   }
   
-  double GetAzimuth(PointCloud* pc, size_t index) {
-      if (pc->pointcloud_type_ == "XYZIR") {
-          double x = pc->points_[index * pc->point_size_ + 0];
-          double y = pc->points_[index * pc->point_size_ + 1];
-          return std::atan2(y, x);
+  virtual ~Filter() = default;
+  
+  const std::string& GetFilterName() const { return filter_name_; }
+  
+  double GetDistance(const PointCloud* pc, size_t index) const {
+      if (!pc || pc->points_.empty()) return 0.0;
+      if (auto it = format_strategies_.find(pc->pointcloud_type_); it != format_strategies_.end()) {
+          return it->second->GetDistance(pc, index);
       }
-
-      return pc->points_[index * pc->point_size_ + 6];
+      return default_strategy_->GetDistance(pc, index);
+  }
+  
+  double GetAzimuth(const PointCloud* pc, size_t index) const {
+      if (!pc || pc->points_.empty()) return 0.0;
+      if (auto it = format_strategies_.find(pc->pointcloud_type_); it != format_strategies_.end()) {
+          return it->second->GetAzimuth(pc, index);
+      }
+      return default_strategy_->GetAzimuth(pc, index);
   }
 
   virtual PointCloud* Apply(PointCloud* pc) = 0;
   
   virtual void SetParams(const FilterParametr& param) {
-      params_ = std::move(param);
+      params_ = param;
   }
 
   const FilterParametr& GetFilterParam() const {
       return params_;
   }
 protected:
-    std::string filter_name_ = "pointcloud_preprocessor_filter";
+    std::string filter_name_;
     Logger logger_;
     FilterParametr params_;
+
+private:
+    std::unordered_map<std::string, std::shared_ptr<PointMetricsStrategy>> format_strategies_;
+    std::shared_ptr<PointMetricsStrategy> default_strategy_;
 };
 
-}  // namespace pointcloud_preprocessor
+
 
 #endif  // POINTCLOUD_PREPROCESSOR__FILTER_HPP_
