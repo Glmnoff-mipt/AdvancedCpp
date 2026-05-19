@@ -4,6 +4,10 @@
 template <typename Derived>
 struct less_than_comparable 
 {
+protected:
+    ~less_than_comparable() = default;
+
+public:
     friend bool operator>(const Derived& lhs, const Derived& rhs) 
     {
         return rhs < lhs;
@@ -39,7 +43,7 @@ protected:
     
     counter(const counter&) { ++count_; }
     
-    counter(counter&&) noexcept = default;
+    counter(counter&&) noexcept { ++count_; }
 
     ~counter() { --count_; }
 
@@ -86,10 +90,7 @@ int main()
     assert(two == two);
     assert(three > two);
     assert(one < two);
-
     assert(one != two); 
-
-    std::cout << "Count: " << counter<Number>::count() << std::endl;
 
     return 0;
 }
