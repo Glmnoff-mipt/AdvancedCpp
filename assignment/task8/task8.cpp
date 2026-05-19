@@ -2,7 +2,7 @@
 #include <string>
 #include <map>
 #include <vector>
-
+#include <stdexcept>
 
 class Expression 
 {
@@ -48,7 +48,12 @@ public:
     int calculate(const std::map<std::string, int>& context) const override 
     {
         auto it = context.find(name_);
-        return (it != context.end()) ? it->second : 0;
+
+        if (it == context.end()) 
+        { 
+            throw std::runtime_error("Variable '" + name_ + "' is not defined");
+        }
+        return it->second;
     }
 
     bool isFlyweight() const override { return true; }
@@ -62,7 +67,10 @@ private:
     Expression* right_;
 
 public:
-    Addition(Expression* left, Expression* right) : left_{left}, right_{right} {}
+    Addition(Expression* left, Expression* right) : left_{left}, right_{right} 
+    {
+        if (!left_ || !right_) throw std::invalid_argument("Expression branches cannot be null");
+    }
 
     ~Addition() override 
     {
@@ -93,7 +101,10 @@ private:
     Expression* right_;
 
 public:
-    Subtraction(Expression* left, Expression* right) : left_{left}, right_{right} {}
+    Subtraction(Expression* left, Expression* right) : left_{left}, right_{right} 
+    {
+        if (!left_ || !right_) throw std::invalid_argument("Expression branches cannot be null");
+    }
 
     ~Subtraction() override 
     {
@@ -137,20 +148,16 @@ public:
 
     Constant* createConstant(int value) 
     {
-        if (constants_.find(value) == constants_.end()) 
-        {
-            constants_[value] = new Constant(value);
-        }
-        return constants_[value];
+        auto& const_ptr = constants_[value];
+        if (!const_ptr) { const_ptr = new Constant(value); }
+        return const_ptr;
     }
 
     Variable* createVariable(const std::string& name) 
     {
-        if (variables_.find(name) == variables_.end()) 
-        {
-            variables_[name] = new Variable(name);
-        }
-        return variables_[name];
+        auto& var_ptr = variables_[name];
+        if (!var_ptr) { var_ptr = new Variable(name); }
+        return var_ptr;
     }
 
     void deleteConstant(int value) 
