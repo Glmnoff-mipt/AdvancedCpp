@@ -3,8 +3,10 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <functional>
 
 class Group;
+
 
 class User 
 {
@@ -12,7 +14,6 @@ private:
     int id_;
     std::string username_;
     std::string info_;
-    
     std::weak_ptr<Group> group_; 
 
 public:
@@ -26,6 +27,7 @@ public:
 
     void setGroup(std::weak_ptr<Group> group) { group_ = group; }
 };
+
 
 class Group 
 {
@@ -43,101 +45,167 @@ public:
 };
 
 
-int main() 
+class SystemManager 
 {
-    std::unordered_map<int, std::shared_ptr<User>> users;
-    std::unordered_map<int, std::shared_ptr<Group>> groups;
+private:
+    std::unordered_map<int, std::shared_ptr<User>> users_;
+    std::unordered_map<int, std::shared_ptr<Group>> groups_;
 
-    std::string command;
-    std::cout << "Waiting for commands\n";
-
-    while (std::cin >> command) 
+public:
+    void createUser(int id, const std::string& name, const std::string& info) 
     {
-        if (command == "createUser") 
+        users_[id] = std::make_shared<User>(id, name, info);
+        std::cout << "ok\n";
+    }
+
+    void deleteUser(int id) 
+    {
+        users_.erase(id); 
+        std::cout << "ok\n";
+    }
+
+    void printAllUsers() const 
+    {
+        for (const auto& [id, user] : users_) 
+        {
+            std::cout << "user " << id << " | " << user->getUsername() << " | " << user->getInfo();
+            if (auto spGroup = user->getGroup().lock()) { std::cout << " | group: " << spGroup->getId() << "\n"; } 
+            else { std::cout << " | group: none\n"; }
+        }
+    }
+
+    void getUser(int id) const 
+    {
+        if (users_.count(id)) 
+        {
+            auto user = users_.at(id);
+            std::cout << "user " << id << " | " << user->getUsername() << " | " << user->getInfo();
+            if (auto spGroup = user->getGroup().lock()) { std::cout << " | group: " << spGroup->getId() << "\n"; } 
+            else { std::cout << " | group: none\n"; }
+        } 
+        else { std::cout << "not found\n"; }
+    }
+
+    void createGroup(int id) 
+    {
+        groups_[id] = std::make_shared<Group>(id);
+        std::cout << "ok\n";
+    }
+
+    void deleteGroup(int id) 
+    {
+        groups_.erase(id);
+        std::cout << "ok\n";
+    }
+
+    void printAllGroups() const 
+    {
+        for (const auto& [id, group] : groups_) 
+        {
+            std::cout << "group " << id << " users:\n";
+            for (const auto& weakUser : group->getUsers()) 
+            {
+                if (auto spUser = weakUser.lock()) { std::cout << "  - " << spUser->getUsername() << "\n"; }
+            }
+        }
+    }
+
+    void getGroup(int id) const 
+    {
+        if (groups_.count(id)) 
+        {
+            std::cout << "group " << id << " users:\n";
+            for (const auto& weakUser : groups_.at(id)->getUsers()) 
+            {
+                if (auto spUser = weakUser.lock()) { std::cout << "  - " << spUser->getUsername() << "\n"; }
+            }
+        } 
+        else { std::cout << "not found\n"; }
+    }
+
+    void addUserToGroup(int userId, int groupId) 
+    {
+        if (users_.count(userId) && groups_.count(groupId)) 
+        {
+            users_[userId]->setGroup(groups_[groupId]);
+            groups_[groupId]->addUser(users_[userId]);
+            std::cout << "ok\n";
+        } 
+        else { std::cout << "error\n"; }
+    }
+};
+
+
+class ConsoleApplication 
+{
+private:
+    SystemManager manager_;
+    std::unordered_map<std::string, std::function<void()>> commands_;
+    bool is_running_ = true;
+
+    void registerCommands() 
+    {
+        commands_["createUser"] = [this]() 
         {
             int id; std::string name, info;
             std::cin >> id >> name >> info;
-            users[id] = std::make_shared<User>(id, name, info);
-            std::cout << "ok\n";
-        } 
-        else if (command == "deleteUser") 
+            manager_.createUser(id, name, info);
+        };
+        commands_["deleteUser"] = [this]() 
         {
             int id; std::cin >> id;
-            users.erase(id); 
-            std::cout << "ok\n";
-        } 
-        else if (command == "allUsers") 
-        {
-            for (const auto& [id, user] : users) 
-            {
-                std::cout << "user " << id << " | " << user->getUsername() << " | " << user->getInfo();
-                
-                if (auto spGroup = user->getGroup().lock()) { std::cout << " | group: " << spGroup->getId() << "\n"; } 
-                else { std::cout << " | group: none\n"; }
-            }
-        } 
-        else if (command == "getUser") 
+            manager_.deleteUser(id);
+        };
+        commands_["allUsers"]   = [this]() { manager_.printAllUsers(); };
+        commands_["getUser"]    = [this]() 
         {
             int id; std::cin >> id;
-            if (users.count(id)) 
-            {
-                auto user = users[id];
-                std::cout << "user " << id << " | " << user->getUsername() << " | " << user->getInfo();
-                
-                if (auto spGroup = user->getGroup().lock()) { std::cout << " | group: " << spGroup->getId() << "\n"; } 
-                else { std::cout << " | group: none\n"; }
-            } 
-            else { std::cout << "not found\n"; }
-        } 
-        else if (command == "createGroup") 
+            manager_.getUser(id);
+        };
+        commands_["createGroup"] = [this]() 
         {
             int id; std::cin >> id;
-            groups[id] = std::make_shared<Group>(id);
-            std::cout << "ok\n";
-        } 
-        else if (command == "deleteGroup") 
+            manager_.createGroup(id);
+        };
+        commands_["deleteGroup"] = [this]() 
         {
             int id; std::cin >> id;
-            groups.erase(id);
-            std::cout << "ok\n";
-        } 
-        else if (command == "allGroups") 
-        {
-            for (const auto& [id, group] : groups) 
-            {
-                std::cout << "group " << id << " users:\n";
-                for (const auto& weakUser : group->getUsers()) 
-                {
-                    if (auto spUser = weakUser.lock()) { std::cout << "  - " << spUser->getUsername() << "\n"; }
-                }
-            }
-        } 
-        else if (command == "getGroup") 
+            manager_.deleteGroup(id);
+        };
+        commands_["allGroups"]  = [this]() { manager_.printAllGroups(); };
+        commands_["getGroup"]   = [this]() 
         {
             int id; std::cin >> id;
-            if (groups.count(id)) 
-            {
-                std::cout << "group " << id << " users:\n";
-                for (const auto& weakUser : groups[id]->getUsers()) 
-                {
-                    if (auto spUser = weakUser.lock()) { std::cout << "  - " << spUser->getUsername() << "\n"; }
-                }
-            } 
-            else { std::cout << "not found\n"; }
-        } 
-        else if (command == "addToGroup") 
+            manager_.getGroup(id);
+        };
+        commands_["addToGroup"] = [this]() 
         {
-            int userId, groupId;
-            std::cin >> userId >> groupId;
-            if (users.count(userId) && groups.count(groupId)) 
-            {
-                users[userId]->setGroup(groups[groupId]);
-                groups[groupId]->addUser(users[userId]);
-                std::cout << "ok\n";
-            } 
-            else { std::cout << "error\n"; }
-        }
-        else if (command == "exit") { break; }
+            int uid, gid; std::cin >> uid >> gid;
+            manager_.addUserToGroup(uid, gid);
+        };
+        commands_["exit"]       = [this]() { is_running_ = false; };
     }
+
+public:
+    ConsoleApplication() { registerCommands(); }
+
+    void run() 
+    {
+        std::string command;
+        std::cout << "waiting for commands\n";
+
+        while (is_running_ && std::cin >> command) 
+        {
+            if (commands_.count(command)) { commands_[command](); } 
+            else { std::cout << "unknown command\n"; }
+        }
+    }
+};
+
+
+int main() 
+{
+    ConsoleApplication app;
+    app.run();
     return 0;
 }
