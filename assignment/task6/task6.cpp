@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <stdexcept> 
 
 class MandatoryCP;
 class OptionalCP;
@@ -23,7 +24,17 @@ protected:
 
 public:
     CheckPoint(std::string name, double lat, double lon) 
-        : name_{std::move(name)}, latitude_{lat}, longitude_{lon} {}
+        : name_{std::move(name)}, latitude_{lat}, longitude_{lon} 
+    {
+        if (lat < -90.0 || lat > 90.0) 
+        {
+            throw std::invalid_argument("Latitude must be between -90.0 and +90.0");
+        }
+        if (lon < -180.0 || lon > 180.0) 
+        {
+            throw std::invalid_argument("Longitude must be between -180.0 and +180.0");
+        }
+    }
 
     virtual ~CheckPoint() = default;
 
@@ -51,7 +62,13 @@ private:
 
 public:
     OptionalCP(std::string name, double lat, double lon, double penalty) 
-        : CheckPoint(std::move(name), lat, lon), penalty_hours_{penalty} {}
+        : CheckPoint(std::move(name), lat, lon), penalty_hours_{penalty} 
+    {
+        if (penalty < 0.0) 
+        {
+            throw std::invalid_argument("Error: Penalty hours cannot be negative");
+        }
+    }
 
     double getPenalty() const { return penalty_hours_; }
 
