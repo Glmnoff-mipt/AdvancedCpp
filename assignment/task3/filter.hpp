@@ -16,17 +16,18 @@ namespace pointcloud_preprocessor
 class FilterParametr {
 public:
     FilterParametr() = default;
-    explicit FilterParametr(std::unordered_map<std::string, double> params) : params_(std::move(params)) {}
+    explicit FilterParametr(std::unordered_map<std::string, double> params) 
+        : params_(std::move(params)) {}
 
     void ChangeParam(const std::string& param_name, double param_val) {
         params_[param_name] = param_val;
     }
 
-    double GetParam(const std::string& param_name) const {
+    double GetParam(const std::string& param_name) const {   // обяз параметры (при отсутствии out of range)
         return params_.at(param_name);
     }
 
-    double GetParam(const std::string& param_name, double default_val) const noexcept {
+    double GetParam(const std::string& param_name, double default_val) const noexcept {   // необяз параметры (гарантия отстутств искл)
         if (auto it = params_.find(param_name); it != params_.end()) {
             return it->second;
         }
@@ -46,22 +47,22 @@ public:
 class DefaultMetricsStrategy : public PointMetricsStrategy {
 public:
     double GetDistance(const PointCloud* pc, size_t index) const override {
-        return pc->points_[index * pc->point_size_ + 5];
+        return pc->GetPoints()[index * pc->GetPointSize() + 5];
     }
     double GetAzimuth(const PointCloud* pc, size_t index) const override {
-        return pc->points_[index * pc->point_size_ + 6];
+        return pc->GetPoints()[index * pc->GetPointSize() + 6];
     }
-};
+};  
 
 class XYZIRMetricsStrategy : public PointMetricsStrategy {
 public:
     double GetDistance(const PointCloud* pc, size_t index) const override {
-        const size_t offset = index * pc->point_size_;
-        return std::hypot(pc->points_[offset], pc->points_[offset + 1], pc->points_[offset + 2]);
+        const size_t offset = index * pc->GetPointSize();
+        return std::hypot(pc->GetPoints()[offset], pc->GetPoints()[offset + 1], pc->GetPoints()[offset + 2]);
     }
     double GetAzimuth(const PointCloud* pc, size_t index) const override {
-        const size_t offset = index * pc->point_size_;
-        return std::atan2(pc->points_[offset + 1], pc->points_[offset]);
+        const size_t offset = index * pc->GetPointSize();
+        return std::atan2(pc->GetPoints()[offset + 1], pc->GetPoints()[offset]);
     }
 };
 
@@ -81,16 +82,16 @@ public:
   const std::string& GetFilterName() const { return filter_name_; }
   
   double GetDistance(const PointCloud* pc, size_t index) const {
-      if (!pc || pc->points_.empty()) return 0.0;
-      if (auto it = format_strategies_.find(pc->pointcloud_type_); it != format_strategies_.end()) {
+      if (!pc || pc->GetSize() == 0) return 0.0;
+      if (auto it = format_strategies_.find(pc->GetPointCloudType()); it != format_strategies_.end()) {
           return it->second->GetDistance(pc, index);
       }
       return default_strategy_->GetDistance(pc, index);
   }
   
   double GetAzimuth(const PointCloud* pc, size_t index) const {
-      if (!pc || pc->points_.empty()) return 0.0;
-      if (auto it = format_strategies_.find(pc->pointcloud_type_); it != format_strategies_.end()) {
+      if (!pc || pc->GetSize() == 0) return 0.0;
+      if (auto it = format_strategies_.find(pc->GetPointCloudType()); it != format_strategies_.end()) {
           return it->second->GetAzimuth(pc, index);
       }
       return default_strategy_->GetAzimuth(pc, index);

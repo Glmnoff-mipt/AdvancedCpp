@@ -3,22 +3,30 @@
 
 #include <iostream>
 #include <string>
-#include <memory>
+#include <memory>  
+
 
 std::ostream& operator<<(std::ostream& stream, const PointCloud& pc) {
-	stream << "Point cloud (" << pc.pointcloud_type_ << "): \n";
-	for (size_t i = 0; i < pc.size_; ++i) {
-		for (size_t j = 0; j < pc.point_size_; ++j) {
-			stream << pc.points_[i * pc.point_size_ + j] << " ";
+	stream << "Point cloud (" << pc.GetPointCloudType() << "): \n";
+    
+    const size_t size = pc.GetSize();
+    const size_t point_size = pc.GetPointSize();
+    const auto& points = pc.GetPoints(); 
+    
+	for (size_t i = 0; i < size; ++i) {
+		for (size_t j = 0; j < point_size; ++j) {
+			stream << points[i * point_size + j] << " ";
 		}
-		stream << "\n";
+		stream << "\n"; 
 	}
 	return stream;
 }
 
+
 int main() {
 	try {
 		PointCloud pc_xyzir, pc_xyzirdat;
+        
 		FillPointCloud(&pc_xyzir, 3, "XYZIR",
 			{ 5.0, 1.2, 2.1, 0.5, 1.0,
 			 -3.2, 0.2, 1.1, 0.7, 1.0,
@@ -27,6 +35,7 @@ int main() {
 		std::cout << "We have: \n" << pc_xyzir << std::endl;
 
 		std::unique_ptr<pointcloud_preprocessor::Filter> cbf = std::make_unique<pointcloud_preprocessor::CropBoxFilter>();
+        
 		cbf->SetParams(pointcloud_preprocessor::FilterParametr({
 			{"min_x", -4.0}, {"max_x", -2.0},
 			{"min_y", 0.1}, {"max_y", 2.0},
