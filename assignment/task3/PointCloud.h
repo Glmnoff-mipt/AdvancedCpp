@@ -31,21 +31,6 @@ public:
         points_.assign(size_ * point_size_, 0.0);
 	}
 
-	void AddPoint(const std::vector<double>& point, size_t ind) {
-		if (point.size() != point_size_) {
-			throw std::runtime_error("Point has unsupported size = " + std::to_string(point.size()) + 
-                                     " for type " + pointcloud_type_);
-        }
-        if (ind >= size_) {
-            throw std::out_of_range("Index out of bounds in PointCloud::AddPoint");
-        }
-		
-        size_t offset = point_size_ * ind;
-		for (size_t i = 0; i < point_size_; ++i) {
-			points_[offset + i] = point[i];
-		}
-	}
-
     template <typename Iterator>
     void AddPoint(Iterator begin, Iterator end, size_t ind) {
         if (static_cast<size_t>(std::distance(begin, end)) != point_size_) {
@@ -59,18 +44,29 @@ public:
         std::copy(begin, end, points_.begin() + offset);
     }
 
+    const std::string& GetPointCloudType() const { return pointcloud_type_; }
+    size_t GetSize() const { return size_; }
+    size_t GetPointSize() const { return point_size_; }
+    
+    const std::vector<double>& GetPoints() const { return points_; }
+    
+    std::vector<double>& GetPointsMutable() { return points_; }
+
+private:
 	std::string pointcloud_type_{""};
 	size_t size_ = 0;
 	size_t point_size_ = 0;
 	std::vector<double> points_;
 };
 
+
 // For tests
 inline void FillPointCloud(PointCloud* pc, size_t points_count, const std::string& point_type, const std::vector<double>& data) {
     if (!pc) return;
 
 	pc->Init(point_type, points_count);
-    const size_t point_size = pc->point_size_;
+    
+    const size_t point_size = pc->GetPointSize(); 
 
     if (data.size() < points_count * point_size) {
         throw std::runtime_error("Insufficient data provided to FillPointCloud");
