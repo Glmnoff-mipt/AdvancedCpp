@@ -115,6 +115,6 @@ private:
     std::shared_ptr<PointMetricsStrategy> default_strategy_;
 };
 
-
+}
 
 #endif  // POINTCLOUD_PREPROCESSOR__FILTER_HPP_
